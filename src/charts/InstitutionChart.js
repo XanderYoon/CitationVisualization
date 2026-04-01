@@ -435,16 +435,19 @@ function drawCityOverlay(group, projection, countryEntry, tooltip, metric, zoomS
     .domain([0, d3.max(cities, (entry) => entry.papers) || 1])
     .range([4 / zoomScale, 18 / zoomScale]);
 
-  const labelCities = cities.slice(0, 10).map((entry, index) => {
-    const horizontalDirection = index % 2 === 0 ? 1 : -1;
-    const verticalOffset = ((index % 4) - 1.5) * (18 / zoomScale);
-    return {
-      ...entry,
-      labelX: entry.x + horizontalDirection * (18 / zoomScale + radius(entry.papers)),
-      labelY: entry.y + verticalOffset,
-      textAnchor: horizontalDirection > 0 ? "start" : "end",
-    };
-  });
+  const labelCities = filterOverlappingCityLabels(
+    cities.slice(0, 10).map((entry, index) => {
+      const horizontalDirection = index % 2 === 0 ? 1 : -1;
+      const verticalOffset = ((index % 4) - 1.5) * (18 / zoomScale);
+      return {
+        ...entry,
+        labelX: entry.x + horizontalDirection * (18 / zoomScale + radius(entry.papers)),
+        labelY: entry.y + verticalOffset,
+        textAnchor: horizontalDirection > 0 ? "start" : "end",
+      };
+    }),
+    Math.max(9, 12 / zoomScale)
+  );
 
   overlayGroup
     .selectAll(".city-bubble")
@@ -542,12 +545,15 @@ function drawCityBubbleFallback(svg, width, height, countryEntry, tooltip, metri
     .slice(0, 20);
 
   const radius = d3.scaleSqrt().domain([0, d3.max(cities, (entry) => entry.papers) || 1]).range([3, 16]);
-  const labelCities = cities.slice(0, 8).map((entry, index) => ({
-    ...entry,
-    labelX: entry.x + (index % 2 === 0 ? 18 : -18),
-    labelY: entry.y + ((index % 4) - 1.5) * 14,
-    textAnchor: index % 2 === 0 ? "start" : "end",
-  }));
+  const labelCities = filterOverlappingCityLabels(
+    cities.slice(0, 8).map((entry, index) => ({
+      ...entry,
+      labelX: entry.x + (index % 2 === 0 ? 18 : -18),
+      labelY: entry.y + ((index % 4) - 1.5) * 14,
+      textAnchor: index % 2 === 0 ? "start" : "end",
+    })),
+    11
+  );
   group
     .selectAll(".city-bubble-fallback")
     .data(cities)
@@ -610,6 +616,39 @@ function computeFeatureTransform(path, feature, width, height) {
     translateX: width / 2 - scale * (x0 + x1) / 2,
     translateY: height / 2 - scale * (y0 + y1) / 2,
   };
+}
+
+function filterOverlappingCityLabels(labels, fontSize = 11) {
+  const placed = [];
+  return [...labels]
+    .sort((a, b) => b.papers - a.papers)
+    .filter((entry) => {
+      const text = `${clampText(entry.city, 16)} (${entry.papers})`;
+      const width = estimateLabelWidth(text, fontSize);
+      const height = fontSize + 4;
+      const box = {
+        left: entry.textAnchor === "end" ? entry.labelX - width : entry.labelX,
+        right: entry.textAnchor === "end" ? entry.labelX : entry.labelX + width,
+        top: entry.labelY - height,
+        bottom: entry.labelY + 2,
+      };
+      const overlaps = placed.some(
+        (candidate) =>
+          box.left < candidate.right &&
+          box.right > candidate.left &&
+          box.top < candidate.bottom &&
+          box.bottom > candidate.top
+      );
+      if (overlaps) {
+        return false;
+      }
+      placed.push(box);
+      return true;
+    });
+}
+
+function estimateLabelWidth(text, fontSize) {
+  return text.length * fontSize * 0.58;
 }
 
 function normalizeCityName(name) {

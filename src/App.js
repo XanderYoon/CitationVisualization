@@ -8,6 +8,7 @@ import { renderNetworkChart } from "./charts/NetworkChart.js";
 import { renderComparisonChart } from "./charts/ComparisonChart.js";
 import { renderScatterPlot } from "./charts/ScatterPlot.js";
 import { renderInstitutionChart } from "./charts/InstitutionChart.js";
+import { renderExperimentalAtlas } from "./charts/ExperimentalAtlas.js";
 
 export async function initializeApp(root) {
   root.innerHTML = `<div class="loading-state">Preparing network metrics and rendering the corpus...</div>`;
@@ -16,6 +17,7 @@ export async function initializeApp(root) {
     const dataset = await loadResearchDataset();
     const store = createStore({
       selectedPaper: null,
+      selectedPaperDistance: 1,
       yearRange: dataset.summary.yearExtent,
       metricView: "citations",
       activeCluster: null,
@@ -34,6 +36,7 @@ export async function initializeApp(root) {
           <a href="#catalysts" class="section-nav__link">Catalysts</a>
           <a href="#metrics" class="section-nav__link">Metrics</a>
           <a href="#institutions" class="section-nav__link">Institutions</a>
+          <a href="#beyond" class="section-nav__link">Beyond Counts</a>
         </nav>
         <div class="app-sections"></div>
       </div>
@@ -111,6 +114,16 @@ export async function initializeApp(root) {
         "Institutional concentration is visible both in rankings and on the map. The key question is whether the same hubs dominate popularity and structural centrality.",
     });
     renderInstitutionChart(geography.viz, dataset, store);
+
+    const sandbox = renderSection(sectionsRoot, {
+      id: "beyond",
+      title: "Beyond citation counts",
+      context:
+        "The final section leaves standard dashboard grammar behind and turns the project’s core claim into more atmospheric evidence: influence is uneven, structural importance hides in plain sight, and visibility is not the same thing as necessity.",
+      insight:
+        "This is the reveal. The visuals below are meant to make mismeasurement feel tangible, not just statistically defensible.",
+    });
+    renderExperimentalAtlas(sandbox.viz, dataset, store);
   } catch (error) {
     root.innerHTML = `<div class="loading-state">Failed to initialize the app: ${error.message}</div>`;
     throw error;

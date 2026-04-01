@@ -12,13 +12,15 @@ const DATA_URLS = {
   papers: "./data/papers_enriched.json",
   papersFallback: "./data/papers.json",
   timeseries: "./data/timeseries.json",
+  clusterProfiles: "./data/cluster_profiles.json",
 };
 
 export async function loadResearchDataset() {
-  const [graph, papers, timeseries] = await Promise.all([
+  const [graph, papers, timeseries, clusterProfiles] = await Promise.all([
     d3.json(DATA_URLS.graph),
     d3.json(DATA_URLS.papers).catch(() => d3.json(DATA_URLS.papersFallback)),
     d3.json(DATA_URLS.timeseries),
+    d3.json(DATA_URLS.clusterProfiles).catch(() => ({})),
   ]);
 
   const pagerank = computePageRank(graph.nodes, graph.edges);
@@ -64,6 +66,7 @@ export async function loadResearchDataset() {
     },
     papers: enrichedPapers,
     timeseries,
+    clusterProfiles,
     summary: {
       totalPapers: enrichedPapers.length,
       totalCitations: d3.sum(citations),

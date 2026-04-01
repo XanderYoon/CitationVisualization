@@ -181,7 +181,7 @@ export function renderGrowthChart(root, dataset, store) {
       .attr("width", Math.max(2, x(state.yearRange[1]) - x(state.yearRange[0])))
       .attr("y", 0)
       .attr("height", innerHeight)
-      .attr("fill", "rgba(37,99,235,0.08)");
+      .attr("fill", "rgba(96, 165, 250, 0.22)");
 
     const brush = d3
       .brushX()
@@ -205,6 +205,8 @@ export function renderGrowthChart(root, dataset, store) {
 
     const brushGroup = focusGroup.append("g").call(brush);
     brushGroup.call(brush.move, state.yearRange.map(x));
+    brushGroup.selectAll(".selection").attr("fill", "rgba(96, 165, 250, 0.24)").attr("stroke", "#60A5FA");
+    brushGroup.selectAll(".handle").attr("fill", "#93C5FD");
 
     focusGroup
       .append("text")

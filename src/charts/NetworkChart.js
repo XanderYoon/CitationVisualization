@@ -6,7 +6,11 @@ import { createTooltip } from "./shared.js";
 const palette = ["#2563EB", "#0F766E", "#DC2626", "#D97706", "#7C3AED", "#0891B2", "#65A30D", "#BE185D"];
 
 export function renderNetworkChart(root, dataset, store) {
-  const card = renderVizCard(root, "Force-directed citation graph", "Hover for focus mode. Click a node to link it to the scatter plot.");
+  const card = renderVizCard(
+    root,
+    "Force-directed citation graph",
+    "Hover for focus mode. Click a node to select it, click again to deselect, and expand the highlight by hop distance."
+  );
   const note = document.createElement("p");
   note.className = "chart-note";
   note.textContent =
@@ -15,6 +19,19 @@ export function renderNetworkChart(root, dataset, store) {
   const meta = document.createElement("div");
   meta.className = "network-meta";
   card.append(meta);
+  const selectionBar = document.createElement("div");
+  selectionBar.className = "network-selection-bar";
+  selectionBar.innerHTML = `
+    <div class="network-selection-bar__header">
+      <span class="rank-pill network-selection-bar__pill"><strong>Selected node</strong> <span data-role="selected-title"></span></span>
+      <button type="button" class="toggle" data-action="clear-selection">Deselect</button>
+    </div>
+    <label class="network-selection-bar__controls">
+      <span>Highlight distance: <strong data-role="distance-value">1</strong> <span data-role="distance-label">hop</span></span>
+      <input type="range" min="1" max="5" step="1" value="1" data-role="distance-slider" />
+    </label>
+  `;
+  card.append(selectionBar);
   const bridgeSummary = document.createElement("div");
   bridgeSummary.className = "rank-summary";
   card.append(bridgeSummary);
@@ -26,6 +43,10 @@ export function renderNetworkChart(root, dataset, store) {
   const canvas = document.createElement("canvas");
   host.append(canvas);
   const tooltip = createTooltip(host);
+  const selectedTitle = selectionBar.querySelector('[data-role="selected-title"]');
+  const distanceValue = selectionBar.querySelector('[data-role="distance-value"]');
+  const distanceLabel = selectionBar.querySelector('[data-role="distance-label"]');
+  const distanceSlider = selectionBar.querySelector('[data-role="distance-slider"]');
 
   const color = (cluster) => palette[cluster % palette.length];
   const neighborMap = buildNeighborMap(dataset.graph.edges);
@@ -84,11 +105,12 @@ export function renderNetworkChart(root, dataset, store) {
     context.translate(transform.x, transform.y);
     context.scale(transform.k, transform.k);
 
-    const activeId = store.getState().selectedPaper;
-    const focusIds =
-      hoveredNode?.id || activeId
-        ? new Set([hoveredNode?.id || activeId, ...(neighborMap.get(hoveredNode?.id || activeId) || [])])
-        : null;
+    const state = store.getState();
+    const activeId = state.selectedPaper;
+    const selectedDistance = Math.max(1, state.selectedPaperDistance || 1);
+    const focusRootId = hoveredNode?.id || activeId;
+    const focusIds = focusRootId ? collectNeighborIds(neighborMap, focusRootId, hoveredNode ? 1 : selectedDistance) : null;
+    const selectedNode = activeId ? nodeById.get(activeId) : null;
 
     context.strokeStyle = "rgba(55, 65, 81, 0.34)";
     context.lineWidth = 1.15 / transform.k;
@@ -127,6 +149,15 @@ export function renderNetworkChart(root, dataset, store) {
       <span>Edges: ${formatInteger.format(links.length)}</span>
       <span>Clusters: ${formatInteger.format(dataset.summary.components.length)}</span>
     `;
+    selectionBar.classList.toggle("is-visible", Boolean(selectedNode));
+    if (selectedNode) {
+      selectedTitle.textContent = clampText(selectedNode.title, 42);
+      distanceValue.textContent = String(selectedDistance);
+      distanceLabel.textContent = selectedDistance === 1 ? "hop" : "hops";
+      if (document.activeElement !== distanceSlider) {
+        distanceSlider.value = String(selectedDistance);
+      }
+    }
     bridgeSummary.innerHTML = bridgePapers
       .map(
         (paper) =>
@@ -134,6 +165,22 @@ export function renderNetworkChart(root, dataset, store) {
       )
       .join("");
   };
+
+  selectionBar.addEventListener("input", (event) => {
+    const slider = event.target.closest('[data-role="distance-slider"]');
+    if (!slider) {
+      return;
+    }
+    store.setState({ selectedPaperDistance: Number(slider.value) });
+  });
+
+  selectionBar.addEventListener("click", (event) => {
+    const clear = event.target.closest('[data-action="clear-selection"]');
+    if (!clear) {
+      return;
+    }
+    store.setState({ selectedPaper: null, activeCluster: null, selectedPaperDistance: 1 });
+  });
 
   simulation.on("tick", draw);
 
@@ -173,7 +220,16 @@ export function renderNetworkChart(root, dataset, store) {
 
   canvas.addEventListener("click", (event) => {
     const node = findNodeAtPoint(event, nodes, transform);
-    store.setState({ selectedPaper: node?.id || null, activeCluster: node?.cluster ?? null });
+    const current = store.getState().selectedPaper;
+    if (!node) {
+      store.setState({ selectedPaper: null, activeCluster: null, selectedPaperDistance: 1 });
+      return;
+    }
+    if (current === node.id) {
+      store.setState({ selectedPaper: null, activeCluster: null, selectedPaperDistance: 1 });
+      return;
+    }
+    store.setState({ selectedPaper: node.id, activeCluster: node.cluster ?? null, selectedPaperDistance: 1 });
   });
 
   store.subscribe(() => draw());
@@ -209,4 +265,23 @@ function buildNeighborMap(edges) {
     map.get(target).add(source);
   });
   return map;
+}
+
+function collectNeighborIds(neighborMap, startId, maxDistance) {
+  const visited = new Set([startId]);
+  const queue = [{ id: startId, distance: 0 }];
+  while (queue.length) {
+    const current = queue.shift();
+    if (current.distance >= maxDistance) {
+      continue;
+    }
+    for (const neighbor of neighborMap.get(current.id) || []) {
+      if (visited.has(neighbor)) {
+        continue;
+      }
+      visited.add(neighbor);
+      queue.push({ id: neighbor, distance: current.distance + 1 });
+    }
+  }
+  return visited;
 }
