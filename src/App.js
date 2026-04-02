@@ -9,6 +9,7 @@ import { renderComparisonChart } from "./charts/ComparisonChart.js";
 import { renderScatterPlot } from "./charts/ScatterPlot.js";
 import { renderInstitutionChart } from "./charts/InstitutionChart.js";
 import { renderExperimentalAtlas } from "./charts/ExperimentalAtlas.js";
+import { renderDataTransparency } from "./components/DataTransparency.js";
 
 export async function initializeApp(root) {
   root.innerHTML = `<div class="loading-state">Preparing network metrics and rendering the corpus...</div>`;
@@ -37,6 +38,7 @@ export async function initializeApp(root) {
           <a href="#metrics" class="section-nav__link">Metrics</a>
           <a href="#institutions" class="section-nav__link">Institutions</a>
           <a href="#beyond" class="section-nav__link">Beyond Counts</a>
+          <a href="#transparency" class="section-nav__link">Transparency</a>
         </nav>
         <div class="app-sections"></div>
       </div>
@@ -124,6 +126,8 @@ export async function initializeApp(root) {
         "This is the reveal. The visuals below are meant to make mismeasurement feel tangible, not just statistically defensible.",
     });
     renderExperimentalAtlas(sandbox.viz, dataset, store);
+
+    renderDataTransparency(sectionsRoot, dataset, store);
   } catch (error) {
     root.innerHTML = `<div class="loading-state">Failed to initialize the app: ${error.message}</div>`;
     throw error;
