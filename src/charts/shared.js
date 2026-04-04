@@ -27,9 +27,17 @@ export function createTooltip(host) {
   return {
     show(html, x, y) {
       tooltip.innerHTML = html;
-      tooltip.style.left = `${x}px`;
-      tooltip.style.top = `${y}px`;
       tooltip.classList.add("is-visible");
+
+      const hostRect = host.getBoundingClientRect();
+      const tooltipRect = tooltip.getBoundingClientRect();
+      const maxLeft = Math.max(8, hostRect.width - tooltipRect.width - 8);
+      const maxTop = Math.max(8, hostRect.height - tooltipRect.height - 8);
+      const clampedLeft = Math.max(8, Math.min(x, maxLeft));
+      const clampedTop = Math.max(8, Math.min(y, maxTop));
+
+      tooltip.style.left = `${clampedLeft}px`;
+      tooltip.style.top = `${clampedTop}px`;
     },
     hide() {
       tooltip.classList.remove("is-visible");

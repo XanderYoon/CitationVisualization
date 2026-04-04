@@ -1,71 +1,176 @@
 import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm";
 import { renderVizCard } from "../components/Section.js";
-import { clampText, formatCompact, formatDecimal, formatInteger, formatPercent } from "../utils/format.js";
+import { clampText, formatInteger } from "../utils/format.js";
 import { createResponsiveSvg, createTooltip } from "./shared.js";
 
-const CLUSTER_COLORS = ["#2563EB", "#0F766E", "#DC6B2F", "#7C3AED", "#D94678", "#0891B2"];
+const CLUSTER_COLORS = ["#2563EB", "#0F766E", "#DC6B2F", "#7C3AED", "#D94678", "#0891B2", "#84CC16", "#B45309"];
+const TOPIC_STOPLIST = new Set([
+  "computer science",
+  "medicine",
+  "biology",
+  "mathematics",
+  "statistics",
+  "engineering",
+  "economics",
+  "psychology",
+  "law",
+  "political science",
+  "philosophy",
+  "nursing",
+  "public health",
+  "health care",
+  "disease",
+  "internal medicine",
+  "endocrinology",
+  "pathology",
+  "environmental health",
+  "cardiology",
+  "medical emergency",
+  "physics",
+  "geography",
+  "sociology",
+  "business",
+  "linguistics",
+  "programming language",
+  "operating system",
+  "database",
+  "computer security",
+  "knowledge management",
+  "economic growth",
+  "population",
+  "cohort",
+  "risk analysis (engineering)",
+  "selection (genetic algorithm)",
+  "feature (linguistics)",
+  "classifier (uml)",
+  "identification (biology)",
+  "paleontology",
+  "preprocessor",
+  "medline",
+  "world wide web",
+  "www",
+  "internet",
+]);
+const TOPIC_LIMIT = 34;
+const EDGE_LIMIT = 90;
+const MIN_TOPIC_FREQUENCY = 5;
+const MIN_EDGE_WEIGHT = 3;
+const TOPIC_MIN_YEAR = 2000;
 
 export function renderExperimentalAtlas(root, dataset, store) {
   const shell = document.createElement("div");
-  shell.className = "experimental-lab";
+  shell.className = "experimental-lab topic-lab";
   root.append(shell);
 
   const atlasCard = renderVizCard(
     shell,
-    "Influence atlas",
-    "A cluster-aware observatory of bridge papers and structural concentration."
+    "Temporal word map",
+    "Concept nodes grow with cumulative frequency, link through co-occurrence, and reorganize as the field develops."
   );
   atlasCard.classList.add("viz-card--immersive");
   atlasCard.insertAdjacentHTML(
     "beforeend",
-    `<p class="chart-note">This is the only cluster-first view in the sandbox. It compresses the most consequential citation components into a single field, emphasizing bridge links and structurally important papers.</p>`
+    `<p class="chart-note">Use the year slider to accumulate the field over time. Larger nodes indicate topics appearing in more papers, while denser links reveal concepts that repeatedly travel together.</p>`
   );
+
+  const controls = document.createElement("div");
+  controls.className = "topic-controls";
+  atlasCard.append(controls);
+
+  const sliderWrap = document.createElement("div");
+  sliderWrap.className = "topic-slider";
+  controls.append(sliderWrap);
+
+  const sliderLabel = document.createElement("label");
+  sliderLabel.className = "inline-label";
+  sliderLabel.textContent = "Cumulative year";
+  sliderWrap.append(sliderLabel);
+
+  const sliderValue = document.createElement("div");
+  sliderValue.className = "topic-slider__value";
+  sliderWrap.append(sliderValue);
+
+  const [, datasetMaxYear] = dataset.summary.yearExtent;
+  const minYear = Math.max(TOPIC_MIN_YEAR, dataset.summary.yearExtent[0]);
+  const maxYear = datasetMaxYear;
+  const yearSlider = document.createElement("input");
+  yearSlider.type = "range";
+  yearSlider.min = String(minYear);
+  yearSlider.max = String(maxYear);
+  yearSlider.step = "1";
+  yearSlider.value = String(store.getState().topicYear ?? maxYear);
+  sliderWrap.append(yearSlider);
+
+  const status = document.createElement("div");
+  status.className = "topic-status";
+  controls.append(status);
+
   const atlasLegend = document.createElement("div");
-  atlasLegend.className = "legend-row legend-row--immersive";
+  atlasLegend.className = "legend-row legend-row--immersive topic-legend";
   atlasCard.append(atlasLegend);
+
   const atlasHost = document.createElement("div");
   atlasCard.append(atlasHost);
-  const atlasChart = createResponsiveSvg(atlasHost, 620);
+  const atlasChart = createResponsiveSvg(atlasHost, 640);
   const atlasTooltip = createTooltip(atlasHost);
 
-  const ribbonCard = renderVizCard(
+  const trendCard = renderVizCard(
     shell,
-    "Recognition gap map",
-    "A clearer comparison of popularity rank versus structural rank for the most under-recognized papers."
+    "Topic trend spotlight",
+    "The strongest risers and decliners compared with the prior cumulative year."
   );
-  ribbonCard.classList.add("viz-card--soft");
-  ribbonCard.insertAdjacentHTML(
+  trendCard.classList.add("viz-card--soft");
+  trendCard.insertAdjacentHTML(
     "beforeend",
-    `<p class="chart-note">Each row is one paper. The left endpoint shows where it ranks by citations, the right endpoint shows where it ranks by PageRank, and the connecting band reveals the size of the mismatch.</p>`
+    `<p class="chart-note">This view compares cumulative counts year-over-year, making it easier to spot acceleration rather than just raw topic size.</p>`
   );
-  const ribbonHost = document.createElement("div");
-  ribbonCard.append(ribbonHost);
-  const ribbonChart = createResponsiveSvg(ribbonHost, 420);
-  const ribbonTooltip = createTooltip(ribbonHost);
+  const trendHost = document.createElement("div");
+  trendHost.className = "topic-summary";
+  trendCard.append(trendHost);
 
-  const barcodeCard = renderVizCard(
+  const clusterCard = renderVizCard(
     shell,
-    "Attention barcode",
-    "A compressed wall of yearly attention concentration across the active publication window."
+    "Cluster summary",
+    "A compact readout of the dominant thematic neighborhoods in the active year."
   );
-  barcodeCard.classList.add("viz-card--soft");
-  barcodeCard.insertAdjacentHTML(
+  clusterCard.classList.add("viz-card--soft");
+  clusterCard.insertAdjacentHTML(
     "beforeend",
-    `<p class="chart-note">Every row is a year, every sliver a paper ordered by citations. Bright early slivers indicate a few papers consuming a large share of that year’s attention budget.</p>`
+    `<p class="chart-note">Clusters are computed from the visible topic co-occurrence network. Labels are generated from the most frequent terms in each community.</p>`
   );
-  const barcodeHost = document.createElement("div");
-  barcodeCard.append(barcodeHost);
-  const barcodeChart = createResponsiveSvg(barcodeHost, 480);
-  const barcodeTooltip = createTooltip(barcodeHost);
+  const clusterHost = document.createElement("div");
+  clusterHost.className = "topic-summary";
+  clusterCard.append(clusterHost);
 
-  const render = () => {
+  const cache = new Map();
+  let hoveredTopic = null;
+
+  function render() {
     const state = store.getState();
-    const filteredPapers = dataset.papers.filter(
-      (paper) => paper.year >= state.yearRange[0] && paper.year <= state.yearRange[1]
-    );
-    const sandboxData = buildSandboxData(dataset, filteredPapers, state.selectedPaper);
+    const topicYear = clampYear(state.topicYear ?? maxYear, minYear, maxYear);
+    if (topicYear !== state.topicYear) {
+      store.setState({ topicYear });
+      return;
+    }
 
-    atlasLegend.innerHTML = sandboxData.clusters
+    yearSlider.value = String(topicYear);
+    sliderValue.textContent = `${minYear}-${topicYear}`;
+
+    const cacheKey = String(topicYear);
+    let topicData = cache.get(cacheKey);
+    if (!topicData) {
+      topicData = buildTopicData(dataset.papers, topicYear, minYear);
+      cache.set(cacheKey, topicData);
+    }
+
+    const selectedTopic = topicData.topicLookup.has(state.selectedTopic) ? state.selectedTopic : null;
+    const activeHoveredTopic = topicData.topicLookup.has(hoveredTopic) ? hoveredTopic : null;
+    if (state.selectedTopic && !selectedTopic) {
+      store.setState({ selectedTopic: null });
+      return;
+    }
+
+    atlasLegend.innerHTML = topicData.clusters
       .map(
         (cluster) => `
           <span class="legend-item">
@@ -76,489 +181,651 @@ export function renderExperimentalAtlas(root, dataset, store) {
       )
       .join("");
 
-    drawInfluenceAtlas(atlasChart, sandboxData, atlasTooltip, store);
-    drawRecognitionRibbons(ribbonChart, sandboxData, ribbonTooltip, store);
-    drawAttentionBarcode(barcodeChart, sandboxData, barcodeTooltip, store);
-  };
+    status.innerHTML = `
+      <span class="metric-chip"><strong>${formatInteger.format(topicData.paperCount)}</strong> papers in view</span>
+      <span class="metric-chip"><strong>${formatInteger.format(topicData.nodes.length)}</strong> visible topics</span>
+      <span class="metric-chip"><strong>${formatInteger.format(topicData.edges.length)}</strong> co-occurrence links</span>
+      <span class="metric-chip"><strong>${activeHoveredTopic || selectedTopic || "All topics"}</strong> focus</span>
+    `;
+
+    drawTemporalWordMap(
+      atlasChart,
+      topicData,
+      selectedTopic,
+      activeHoveredTopic,
+      atlasTooltip,
+      store,
+      (topicId) => {
+        hoveredTopic = topicId;
+        render();
+      }
+    );
+    renderTrendSpotlight(trendHost, topicData, selectedTopic);
+    renderClusterSummary(clusterHost, topicData, selectedTopic);
+  }
+
+  yearSlider.addEventListener("input", (event) => {
+    store.setState({
+      topicYear: clampYear(Number(event.target.value), minYear, maxYear),
+    });
+  });
 
   store.subscribe(render);
   atlasHost.addEventListener("chart:resize", render);
-  ribbonHost.addEventListener("chart:resize", render);
-  barcodeHost.addEventListener("chart:resize", render);
+  atlasHost.addEventListener("mouseleave", () => {
+    hoveredTopic = null;
+    render();
+  });
 }
 
-function buildSandboxData(dataset, filteredPapers, selectedPaperId) {
-  const filteredPaperIds = new Set(filteredPapers.map((paper) => paper.id));
-  const filteredNodeIds = new Set(dataset.graph.nodes.filter((node) => filteredPaperIds.has(node.id)).map((node) => node.id));
-  const filteredEdges = dataset.graph.edges.filter((edge) => {
-    const sourceId = typeof edge.source === "object" ? edge.source.id : edge.source;
-    const targetId = typeof edge.target === "object" ? edge.target.id : edge.target;
-    return filteredNodeIds.has(sourceId) && filteredNodeIds.has(targetId);
-  });
+function buildTopicData(papers, topicYear, minYear) {
+  const filteredPapers = papers.filter((paper) => Number.isFinite(paper.year) && paper.year >= minYear && paper.year <= topicYear);
+  const priorPapers = papers.filter((paper) => Number.isFinite(paper.year) && paper.year >= minYear && paper.year <= topicYear - 1);
+  const prePriorPapers = papers.filter((paper) => Number.isFinite(paper.year) && paper.year >= minYear && paper.year <= topicYear - 2);
 
-  const nodeById = new Map(filteredPapers.map((paper) => [paper.id, paper]));
-  const citationExtent = safeExtent(filteredPapers, (paper) => paper.citations || 0);
-  const pagerankExtent = safeExtent(filteredPapers, (paper) => paper.pagerank || 0);
-  const degreeExtent = safeExtent(filteredPapers, (paper) => paper.degree || 0);
-  const citationScale = d3.scaleSqrt().domain(citationExtent).range([0.2, 1]).clamp(true);
-  const pagerankScale = d3.scaleLinear().domain(pagerankExtent).range([0.2, 1]).clamp(true);
-  const degreeScale = d3.scaleLinear().domain(degreeExtent).range([0.2, 1]).clamp(true);
-  const clusterProfiles = dataset.clusterProfiles || {};
+  const currentCounts = new Map();
+  const previousCounts = new Map();
+  const prePreviousCounts = new Map();
+  accumulateTopicCounts(filteredPapers, currentCounts);
+  accumulateTopicCounts(priorPapers, previousCounts);
+  accumulateTopicCounts(prePriorPapers, prePreviousCounts);
 
-  const rankedClusters = d3
-    .groups(filteredPapers, (paper) => paper.cluster ?? 0)
-    .map(([clusterId, papers], index) => {
-      const profile = clusterProfiles[String(clusterId)] || {};
-      return {
-        clusterId,
-        papers,
-        totalPagerank: d3.sum(papers, (paper) => paper.pagerank || 0),
-        totalCitations: d3.sum(papers, (paper) => paper.citations || 0),
-        color: CLUSTER_COLORS[index % CLUSTER_COLORS.length],
-        label: profile.shortLabel || `Cluster ${index + 1}`,
-      };
-    })
-    .sort((a, b) => b.totalPagerank - a.totalPagerank)
-    .slice(0, 5)
-    .map((cluster, index) => ({ ...cluster, color: CLUSTER_COLORS[index % CLUSTER_COLORS.length] }));
+  const candidateTopics = [...currentCounts.entries()]
+    .filter(([, count]) => count >= MIN_TOPIC_FREQUENCY)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, TOPIC_LIMIT * 2)
+    .map(([topic]) => topic);
 
-  const clusterIds = new Set(rankedClusters.map((cluster) => cluster.clusterId));
-  const rankedNodes = filteredPapers
-    .filter((paper) => clusterIds.has(paper.cluster) || paper.id === selectedPaperId)
-    .map((paper) => ({
-      ...paper,
-      atlasScore:
-        pagerankScale(paper.pagerank || 0) * 0.5 +
-        citationScale(paper.citations || 0) * 0.25 +
-        degreeScale(paper.degree || 0) * 0.25,
-    }))
-    .sort((a, b) => b.atlasScore - a.atlasScore);
+  const visibleTopics = new Set(candidateTopics);
+  const topicPapers = new Map(candidateTopics.map((topic) => [topic, []]));
+  const edgeWeights = new Map();
 
-  const chosen = new Map();
-  rankedClusters.forEach((cluster) => {
-    rankedNodes
-      .filter((paper) => paper.cluster === cluster.clusterId)
-      .slice(0, 8)
-      .forEach((paper) => chosen.set(paper.id, { ...paper, color: cluster.color, clusterLabel: cluster.label }));
-  });
-  rankedNodes.slice(0, 12).forEach((paper) => {
-    if (!chosen.has(paper.id)) {
-      const cluster = rankedClusters.find((entry) => entry.clusterId === paper.cluster);
-      chosen.set(paper.id, {
-        ...paper,
-        color: cluster?.color || "#2563EB",
-        clusterLabel: cluster?.label || "Satellite",
-      });
+  filteredPapers.forEach((paper) => {
+    const topics = extractTopics(paper).filter((topic) => visibleTopics.has(topic));
+    if (!topics.length) {
+      return;
+    }
+
+    topics.forEach((topic) => {
+      const papersForTopic = topicPapers.get(topic);
+      if (papersForTopic && papersForTopic.length < 5) {
+        papersForTopic.push({
+          id: paper.id,
+          title: paper.title,
+          year: paper.year,
+        });
+      }
+    });
+
+    for (let i = 0; i < topics.length; i += 1) {
+      for (let j = i + 1; j < topics.length; j += 1) {
+        const source = topics[i];
+        const target = topics[j];
+        const key = source < target ? `${source}|||${target}` : `${target}|||${source}`;
+        edgeWeights.set(key, (edgeWeights.get(key) || 0) + 1);
+      }
     }
   });
-  if (selectedPaperId && nodeById.has(selectedPaperId)) {
-    const paper = nodeById.get(selectedPaperId);
-    const cluster = rankedClusters.find((entry) => entry.clusterId === paper.cluster);
-    chosen.set(selectedPaperId, {
-      ...paper,
-      atlasScore:
-        pagerankScale(paper.pagerank || 0) * 0.5 +
-        citationScale(paper.citations || 0) * 0.25 +
-        degreeScale(paper.degree || 0) * 0.25,
-      color: cluster?.color || "#111827",
-      clusterLabel: cluster?.label || "Selected paper",
-    });
-  }
 
-  const atlasNodes = [...chosen.values()];
-  const selectedIds = new Set(atlasNodes.map((node) => node.id));
-  const atlasLinks = filteredEdges
-    .filter((edge) => {
-      const sourceId = typeof edge.source === "object" ? edge.source.id : edge.source;
-      const targetId = typeof edge.target === "object" ? edge.target.id : edge.target;
-      return selectedIds.has(sourceId) && selectedIds.has(targetId);
+  const provisionalNodes = candidateTopics.map((topic) => ({
+    id: topic,
+    label: topic,
+    frequency: currentCounts.get(topic) || 0,
+    growthDelta: (currentCounts.get(topic) || 0) - (previousCounts.get(topic) || 0),
+    momentum: ((currentCounts.get(topic) || 0) - (previousCounts.get(topic) || 0)) - ((previousCounts.get(topic) || 0) - (prePreviousCounts.get(topic) || 0)),
+    cluster: -1,
+    papers: topicPapers.get(topic) || [],
+    strongestLink: null,
+    strongestWeight: 0,
+    degree: 0,
+  }));
+  const nodeById = new Map(provisionalNodes.map((node) => [node.id, node]));
+
+  const edges = [...edgeWeights.entries()]
+    .map(([key, weight]) => {
+      const [source, target] = key.split("|||");
+      return { source, target, weight };
     })
-    .map((edge) => {
-      const sourceId = typeof edge.source === "object" ? edge.source.id : edge.source;
-      const targetId = typeof edge.target === "object" ? edge.target.id : edge.target;
-      const source = chosen.get(sourceId);
-      const target = chosen.get(targetId);
-      return {
-        source,
-        target,
-        crossCluster: source?.cluster !== target?.cluster,
-        weight: (source?.pagerank || 0) + (target?.pagerank || 0),
-      };
-    })
-    .filter((edge) => edge.source && edge.target)
-    .sort((a, b) => Number(b.crossCluster) - Number(a.crossCluster) || b.weight - a.weight)
-    .slice(0, 80);
+    .filter((edge) => edge.weight >= MIN_EDGE_WEIGHT && visibleTopics.has(edge.source) && visibleTopics.has(edge.target))
+    .sort((a, b) => b.weight - a.weight || a.source.localeCompare(b.source))
+    .slice(0, EDGE_LIMIT);
 
-  const citationRank = new Map(
-    [...filteredPapers]
-      .sort((a, b) => (b.citations || 0) - (a.citations || 0))
-      .map((paper, index) => [paper.id, index + 1])
-  );
-  const structuralRank = new Map(
-    [...filteredPapers]
-      .sort((a, b) => (b.pagerank || 0) - (a.pagerank || 0))
-      .map((paper, index) => [paper.id, index + 1])
-  );
-
-  const hiddenConnectors = [...filteredPapers]
-    .map((paper) => ({
-      ...paper,
-      citationNormalized: citationScale(paper.citations || 0),
-      pagerankNormalizedLocal: pagerankScale(paper.pagerank || 0),
-      gapScore: pagerankScale(paper.pagerank || 0) - citationScale(paper.citations || 0),
-      citationRank: citationRank.get(paper.id) || filteredPapers.length,
-      structuralRank: structuralRank.get(paper.id) || filteredPapers.length,
-    }))
-    .filter((paper) => paper.gapScore > 0)
-    .sort((a, b) => b.gapScore - a.gapScore)
-    .slice(0, 12);
-
-  const activeYears = d3
-    .groups(filteredPapers, (paper) => paper.year)
-    .map(([year, papers]) => ({
-      year: Number(year),
-      papers,
-      totalCitations: d3.sum(papers, (paper) => paper.citations || 0),
-      gini:
-        dataset.timeseries.find((row) => row.year === Number(year))?.gini_citations ??
-        calculateGini(papers.map((paper) => paper.citations || 0)),
-    }))
-    .sort((a, b) => a.year - b.year);
-
-  const attentionRows = activeYears.slice(-18).map((entry) => {
-    const sorted = [...entry.papers].sort((a, b) => (b.citations || 0) - (a.citations || 0));
-    const total = d3.sum(sorted, (paper) => paper.citations || 0) || 1;
-    return {
-      year: entry.year,
-      gini: entry.gini,
-      paperCount: sorted.length,
-      cells: sorted.slice(0, 56).map((paper, index) => ({
-        paper,
-        order: index,
-        share: (paper.citations || 0) / total,
-      })),
-    };
+  edges.forEach((edge) => {
+    const source = nodeById.get(edge.source);
+    const target = nodeById.get(edge.target);
+    if (!source || !target) {
+      return;
+    }
+    source.degree += 1;
+    target.degree += 1;
+    if (edge.weight > source.strongestWeight) {
+      source.strongestWeight = edge.weight;
+      source.strongestLink = edge.target;
+    }
+    if (edge.weight > target.strongestWeight) {
+      target.strongestWeight = edge.weight;
+      target.strongestLink = edge.source;
+    }
   });
 
-  const selectedNode = selectedPaperId ? nodeById.get(selectedPaperId) : null;
+  const connectedTopicIds = new Set(edges.flatMap((edge) => [edge.source, edge.target]));
+  const nodes = provisionalNodes
+    .filter((node) => connectedTopicIds.has(node.id))
+    .sort((a, b) => b.frequency - a.frequency || b.growthDelta - a.growthDelta)
+    .slice(0, TOPIC_LIMIT);
+  const visibleTopicIds = new Set(nodes.map((node) => node.id));
+  const filteredEdges = edges.filter((edge) => visibleTopicIds.has(edge.source) && visibleTopicIds.has(edge.target));
+
+  nodes.forEach((node) => {
+    node.degree = 0;
+    node.strongestLink = null;
+    node.strongestWeight = 0;
+  });
+
+  filteredEdges.forEach((edge) => {
+    const source = nodeById.get(edge.source);
+    const target = nodeById.get(edge.target);
+    if (!source || !target) {
+      return;
+    }
+    source.degree += 1;
+    target.degree += 1;
+    if (edge.weight > source.strongestWeight) {
+      source.strongestWeight = edge.weight;
+      source.strongestLink = edge.target;
+    }
+    if (edge.weight > target.strongestWeight) {
+      target.strongestWeight = edge.weight;
+      target.strongestLink = edge.source;
+    }
+  });
+
+  const clusters = computeTopicClusters(nodes, filteredEdges);
+  const clusterByTopic = new Map();
+  clusters.forEach((cluster) => {
+    cluster.topicIds.forEach((topicId) => clusterByTopic.set(topicId, cluster.id));
+  });
+
+  nodes.forEach((node) => {
+    node.cluster = clusterByTopic.get(node.id) ?? clusters.length;
+  });
+
+  const finalClusters = clusters.map((cluster, index) => ({
+    id: cluster.id,
+    color: CLUSTER_COLORS[index % CLUSTER_COLORS.length],
+    label: cluster.topTerms.slice(0, 2).join(" + ") || `Topic cluster ${index + 1}`,
+    topTerms: cluster.topTerms,
+    topicIds: cluster.topicIds,
+    totalFrequency: cluster.totalFrequency,
+    size: cluster.topicIds.length,
+  }));
+  const finalClusterById = new Map(finalClusters.map((cluster) => [cluster.id, cluster]));
+
+  nodes.forEach((node) => {
+    node.color = finalClusterById.get(node.cluster)?.color || "#2563EB";
+    node.clusterLabel = finalClusterById.get(node.cluster)?.label || "Independent topic";
+  });
 
   return {
-    clusters: rankedClusters,
-    atlasNodes,
-    atlasLinks,
-    hiddenConnectors,
-    attentionRows,
-    selectedPaperId,
-    selectedNode,
+    year: topicYear,
+    paperCount: filteredPapers.length,
+    nodes,
+    edges: filteredEdges,
+    clusters: finalClusters.sort((a, b) => b.totalFrequency - a.totalFrequency),
+    trendLeaders: buildTrendLeaders(nodes),
+    topicLookup: nodeById,
   };
 }
 
-function drawInfluenceAtlas(chart, data, tooltip, store) {
+function drawTemporalWordMap(chart, data, selectedTopic, hoveredTopic, tooltip, store, setHoveredTopic) {
   const { svg, measure } = chart;
   const { width, height } = measure();
   svg.selectAll("*").remove();
 
-  if (!data.atlasNodes.length) {
-    drawEmptyState(svg, width, height, "No papers fall inside the current year range.");
+  if (!data.nodes.length) {
+    drawEmptyState(svg, width, height, "No visible topics appear in the current year.");
     return;
   }
 
   const defs = svg.append("defs");
-  const backgroundGradient = defs.append("radialGradient").attr("id", "atlas-bg").attr("cx", "50%").attr("cy", "48%");
+  const backgroundGradient = defs.append("radialGradient").attr("id", "topic-map-bg").attr("cx", "50%").attr("cy", "48%");
   backgroundGradient.append("stop").attr("offset", "0%").attr("stop-color", "#ffffff");
-  backgroundGradient.append("stop").attr("offset", "65%").attr("stop-color", "#eef4ff");
+  backgroundGradient.append("stop").attr("offset", "68%").attr("stop-color", "#eef4ff");
   backgroundGradient.append("stop").attr("offset", "100%").attr("stop-color", "#dfeafc");
-  const glow = defs.append("filter").attr("id", "atlas-glow");
-  glow.append("feGaussianBlur").attr("stdDeviation", 10).attr("result", "blur");
-  glow.append("feMerge").call((merge) => {
-    merge.append("feMergeNode").attr("in", "blur");
-    merge.append("feMergeNode").attr("in", "SourceGraphic");
-  });
 
-  svg.append("rect").attr("width", width).attr("height", height).attr("rx", 24).attr("fill", "url(#atlas-bg)");
+  svg.append("rect").attr("width", width).attr("height", height).attr("rx", 24).attr("fill", "url(#topic-map-bg)");
 
-  const centerX = width / 2;
-  const centerY = height / 2;
-  const outerRadius = Math.min(width, height) * 0.38;
-  const innerRadius = outerRadius * 0.44;
   const root = svg.append("g");
-  const sectorGroup = root.append("g");
   const linkGroup = root.append("g");
   const nodeGroup = root.append("g");
   const labelGroup = root.append("g");
+  const layoutPadding = {
+    top: 52,
+    right: 34,
+    bottom: 40,
+    left: 34,
+  };
+  const layoutWidth = width - layoutPadding.left - layoutPadding.right;
+  const layoutHeight = height - layoutPadding.top - layoutPadding.bottom;
+  const layoutCenterX = layoutPadding.left + layoutWidth / 2;
+  const layoutCenterY = layoutPadding.top + layoutHeight / 2;
 
-  data.clusters.forEach((cluster, index) => {
-    const startAngle = -Math.PI / 2 + (index / data.clusters.length) * Math.PI * 2;
-    const endAngle = -Math.PI / 2 + ((index + 1) / data.clusters.length) * Math.PI * 2;
-    sectorGroup
-      .append("path")
-      .attr("d", d3.arc().innerRadius(innerRadius).outerRadius(outerRadius).startAngle(startAngle).endAngle(endAngle)())
-      .attr("transform", `translate(${centerX},${centerY})`)
-      .attr("fill", cluster.color)
-      .attr("fill-opacity", 0.07)
-      .attr("stroke", cluster.color)
-      .attr("stroke-opacity", 0.18);
-
-    const angle = (startAngle + endAngle) / 2;
-    const labelRadius = outerRadius + 22;
-    labelGroup
-      .append("text")
-      .attr("x", centerX + Math.cos(angle) * labelRadius)
-      .attr("y", centerY + Math.sin(angle) * labelRadius)
-      .attr("class", "experimental-label")
-      .attr("text-anchor", Math.cos(angle) > 0.15 ? "start" : Math.cos(angle) < -0.15 ? "end" : "middle")
-      .text(`${cluster.label} · ${formatCompact.format(cluster.totalCitations)} cites`);
-  });
-
-  const anchorByCluster = new Map(
-    data.clusters.map((cluster, index) => {
-      const angle = -Math.PI / 2 + ((index + 0.5) / data.clusters.length) * Math.PI * 2;
+  const clusters = data.clusters.length ? data.clusters : [{ id: 0, color: "#2563EB", label: "Visible topics" }];
+  const clusterAnchors = new Map(
+    clusters.map((cluster, index) => {
+      const angle = -Math.PI / 2 + (index / clusters.length) * Math.PI * 2;
+      const radiusX = layoutWidth * 0.31;
+      const radiusY = layoutHeight * 0.24;
       return [
-        cluster.clusterId,
+        cluster.id,
         {
-          x: centerX + Math.cos(angle) * (innerRadius + outerRadius) * 0.5,
-          y: centerY + Math.sin(angle) * (innerRadius + outerRadius) * 0.5,
+          x: layoutCenterX + Math.cos(angle) * radiusX,
+          y: layoutCenterY + Math.sin(angle) * radiusY,
         },
       ];
     })
   );
 
-  const nodes = data.atlasNodes.map((node) => ({
+  const frequencyExtent = safeExtent(data.nodes, (node) => node.frequency);
+  const radius = d3.scaleSqrt().domain(frequencyExtent).range([10, 34]);
+  const linkWeightExtent = safeExtent(data.edges, (edge) => edge.weight);
+  const linkOpacity = d3.scaleLinear().domain(linkWeightExtent).range([0.14, 0.42]);
+  const linkWidth = d3.scaleLinear().domain(linkWeightExtent).range([1, 3.8]);
+
+  const nodes = data.nodes.map((node) => ({
     ...node,
-    x: anchorByCluster.get(node.cluster)?.x || centerX,
-    y: anchorByCluster.get(node.cluster)?.y || centerY,
+    x: clusterAnchors.get(node.cluster)?.x || layoutCenterX,
+    y: clusterAnchors.get(node.cluster)?.y || layoutCenterY,
   }));
   const nodeById = new Map(nodes.map((node) => [node.id, node]));
-  const links = data.atlasLinks
-    .map((link) => ({ ...link, source: nodeById.get(link.source.id), target: nodeById.get(link.target.id) }))
-    .filter((link) => link.source && link.target);
+  const links = data.edges
+    .map((edge) => ({
+      ...edge,
+      source: nodeById.get(edge.source),
+      target: nodeById.get(edge.target),
+    }))
+    .filter((edge) => edge.source && edge.target);
 
   d3.forceSimulation(nodes)
-    .force("link", d3.forceLink(links).id((node) => node.id).distance((link) => (link.crossCluster ? 140 : 80)).strength((link) => (link.crossCluster ? 0.18 : 0.09)))
-    .force("x", d3.forceX((node) => anchorByCluster.get(node.cluster)?.x || centerX).strength(0.22))
-    .force("y", d3.forceY((node) => anchorByCluster.get(node.cluster)?.y || centerY).strength(0.22))
-    .force("charge", d3.forceManyBody().strength(-42))
-    .force("collision", d3.forceCollide((node) => 8 + (node.atlasScore || 0) * 18))
+    .force("link", d3.forceLink(links).id((node) => node.id).distance((edge) => 185 - Math.min(72, edge.weight * 9)).strength(0.12))
+    .force("charge", d3.forceManyBody().strength((node) => -180 - radius(node.frequency) * 7))
+    .force("collision", d3.forceCollide((node) => radius(node.frequency) + 12))
+    .force("x", d3.forceX((node) => clusterAnchors.get(node.cluster)?.x || layoutCenterX).strength(0.045))
+    .force("y", d3.forceY((node) => clusterAnchors.get(node.cluster)?.y || layoutCenterY).strength(0.045))
     .stop()
-    .tick(240);
+    .tick(420);
+
+  stretchNodesToViewport(nodes, radius, layoutPadding, width, height);
+
+  nodes.forEach((node) => {
+    const boundedRadius = radius(node.frequency);
+    node.x = Math.max(layoutPadding.left + boundedRadius, Math.min(width - layoutPadding.right - boundedRadius, node.x));
+    node.y = Math.max(layoutPadding.top + boundedRadius, Math.min(height - layoutPadding.bottom - boundedRadius, node.y));
+  });
+
+  const focusTopic = hoveredTopic || selectedTopic;
+  const focusIds = new Set();
+  if (focusTopic) {
+    focusIds.add(focusTopic);
+    links.forEach((link) => {
+      if (link.source.id === focusTopic) {
+        focusIds.add(link.target.id);
+      }
+      if (link.target.id === focusTopic) {
+        focusIds.add(link.source.id);
+      }
+    });
+  }
 
   linkGroup
-    .selectAll("path")
+    .selectAll("line")
     .data(links)
-    .join("path")
-    .attr("d", (link) => buildRibbonPath(link.source, link.target))
-    .attr("fill", "none")
-    .attr("stroke", (link) => (link.crossCluster ? "#111827" : link.source.color))
-    .attr("stroke-opacity", (link) => (link.crossCluster ? 0.16 : 0.1))
-    .attr("stroke-width", (link) => (link.crossCluster ? 1.6 : 1.1));
+    .join("line")
+    .attr("x1", (link) => link.source.x)
+    .attr("y1", (link) => link.source.y)
+    .attr("x2", (link) => link.target.x)
+    .attr("y2", (link) => link.target.y)
+    .attr("stroke", (link) => {
+      if (focusTopic && (link.source.id === focusTopic || link.target.id === focusTopic)) {
+        return "#111827";
+      }
+      return link.source.color;
+    })
+    .attr("stroke-width", (link) => linkWidth(link.weight))
+    .attr("stroke-opacity", (link) => {
+      if (!focusTopic) {
+        return linkOpacity(link.weight);
+      }
+      return link.source.id === focusTopic || link.target.id === focusTopic ? 0.62 : 0.05;
+    });
 
-  const haloNodes = nodeGroup.selectAll(".experimental-node").data(nodes).join("g").attr("class", "experimental-node").attr("transform", (node) => `translate(${node.x},${node.y})`);
-  haloNodes.append("circle").attr("r", (node) => 10 + (node.atlasScore || 0) * 16).attr("fill", (node) => node.color).attr("fill-opacity", 0.12).attr("filter", "url(#atlas-glow)");
-  haloNodes
+  const nodeEnter = nodeGroup
+    .selectAll(".topic-node")
+    .data(nodes)
+    .join("g")
+    .attr("class", "topic-node")
+    .attr("transform", (node) => `translate(${node.x},${node.y})`);
+
+  nodeEnter
     .append("circle")
-    .attr("r", (node) => 4 + (node.atlasScore || 0) * 8)
-    .attr("fill", (node) => (data.selectedPaperId === node.id ? "#111827" : node.color))
+    .attr("r", (node) => radius(node.frequency) + 5)
+    .attr("fill", (node) => node.color)
+    .attr("fill-opacity", (node) => (focusTopic && !focusIds.has(node.id) ? 0.04 : 0.12));
+
+  nodeEnter
+    .append("circle")
+    .attr("r", (node) => radius(node.frequency))
+    .attr("fill", (node) => (focusTopic === node.id ? "#111827" : node.color))
     .attr("stroke", "#ffffff")
-    .attr("stroke-width", (node) => (data.selectedPaperId === node.id ? 2.4 : 1.4))
+    .attr("stroke-width", (node) => (focusTopic === node.id ? 2.8 : 1.5))
     .style("cursor", "pointer")
+    .attr("opacity", (node) => (focusTopic && !focusIds.has(node.id) ? 0.14 : 0.92))
     .on("mouseenter", (event, node) => {
+      setHoveredTopic(node.id);
       tooltip.show(
-        `<strong>${clampText(node.title, 92)}</strong>
-        Cluster: ${node.clusterLabel}<br />
-        Citations: ${formatInteger.format(node.citations || 0)}<br />
-        PageRank: ${formatDecimal(node.pagerank || 0, 4)}<br />
-        Degree: ${formatInteger.format(node.degree || 0)}`,
+        `<strong>${node.label}</strong>
+        Papers through ${data.year}: ${formatInteger.format(node.frequency)}<br />
+        Strongest linked topic: ${node.strongestLink ? `${node.strongestLink} (${formatInteger.format(node.strongestWeight)})` : "None"}<br />
+        Connected topics: ${formatInteger.format(node.degree)}<br />
+        Trend vs prior year: ${formatTrend(node.growthDelta)}`,
         event.offsetX + 12,
         event.offsetY + 12
       );
     })
-    .on("mouseleave", () => tooltip.hide())
-    .on("click", (_, node) => store.setState({ selectedPaper: node.id }));
+    .on("mouseleave", () => {
+      setHoveredTopic(null);
+      tooltip.hide();
+    })
+    .on("click", (_, node) => {
+      store.setState({
+        selectedTopic: store.getState().selectedTopic === node.id ? null : node.id,
+      });
+    });
 
   labelGroup
-    .selectAll(".experimental-node-label")
-    .data(nodes.filter((node) => node.atlasScore > 0.72 || data.selectedPaperId === node.id))
+    .selectAll("text")
+    .data(nodes.filter((node) => shouldShowLabel(node, selectedTopic, radius)), (node) => node.id)
     .join("text")
-    .attr("class", "experimental-node-label")
-    .attr("x", (node) => node.x + 12)
-    .attr("y", (node) => node.y - 12)
-    .text((node) => clampText(node.title, 34));
-
-  const bridgeCount = links.filter((link) => link.crossCluster).length;
-  root.append("circle").attr("cx", centerX).attr("cy", centerY).attr("r", innerRadius * 0.74).attr("fill", "rgba(255,255,255,0.86)").attr("stroke", "rgba(37,99,235,0.16)");
-  root.append("text").attr("x", centerX).attr("y", centerY - 18).attr("class", "experimental-core experimental-core--eyebrow").attr("text-anchor", "middle").text("Bridge network");
-  root.append("text").attr("x", centerX).attr("y", centerY + 10).attr("class", "experimental-core").attr("text-anchor", "middle").text(`${bridgeCount} cross-cluster links`);
-  root
-    .append("text")
-    .attr("x", centerX)
-    .attr("y", centerY + 34)
-    .attr("class", "experimental-core experimental-core--small")
+    .attr("class", "topic-node-label")
+    .attr("x", (node) => node.x)
+    .attr("y", (node) => node.y + 4)
     .attr("text-anchor", "middle")
-    .text(data.selectedNode ? clampText(data.selectedNode.title, 38) : "Select a paper anywhere in the platform");
+    .attr("opacity", (node) => (focusTopic && !focusIds.has(node.id) ? 0.14 : 1))
+    .text((node) => node.label);
 }
 
-function drawRecognitionRibbons(chart, data, tooltip, store) {
-  const { svg, measure } = chart;
-  const { width, height } = measure();
-  svg.selectAll("*").remove();
+function renderTrendSpotlight(root, data, selectedTopic) {
+  const selectedNode = selectedTopic ? data.topicLookup.get(selectedTopic) : null;
+  const risers = selectedNode
+    ? [selectedNode]
+    : data.trendLeaders.risers;
+  const decliners = selectedNode
+    ? [selectedNode]
+    : data.trendLeaders.decliners;
 
-  if (!data.hiddenConnectors.length) {
-    drawEmptyState(svg, width, height, "No recognition-gap papers are available for the current selection.");
-    return;
+  root.innerHTML = `
+    <div class="topic-summary__grid">
+      <section class="topic-panel">
+        <div class="topic-panel__header">
+          <h4 class="topic-panel__title">${selectedNode ? "Selected topic" : "Fastest risers"}</h4>
+          <span class="annotation-chip">${data.year}</span>
+        </div>
+        ${renderTrendList(risers, "up")}
+      </section>
+      <section class="topic-panel">
+        <div class="topic-panel__header">
+          <h4 class="topic-panel__title">${selectedNode ? "Connected context" : "Cooling topics"}</h4>
+          <span class="annotation-chip">${selectedNode ? "focus" : "vs prior year"}</span>
+        </div>
+        ${
+          selectedNode
+            ? renderSelectedContext(selectedNode, data)
+            : renderTrendList(decliners, "down")
+        }
+      </section>
+    </div>
+  `;
+}
+
+function renderClusterSummary(root, data, selectedTopic) {
+  const selectedNode = selectedTopic ? data.topicLookup.get(selectedTopic) : null;
+  const clusters = selectedTopic
+    ? data.clusters.filter((cluster) => cluster.id === selectedNode?.cluster)
+    : data.clusters.slice(0, 6);
+
+  root.innerHTML = clusters.length
+    ? `
+      <div class="cluster-list">
+        ${clusters
+          .map(
+            (cluster) => `
+              <article class="cluster-card">
+                <div class="cluster-card__header">
+                  <span class="legend-item">
+                    <span class="legend-swatch" style="background:${cluster.color}"></span>
+                    ${cluster.label}
+                  </span>
+                  <strong>${formatInteger.format(cluster.totalFrequency)}</strong>
+                </div>
+                <p class="cluster-card__meta">${cluster.size} topics visible in ${data.year}</p>
+                <p class="cluster-card__terms">${cluster.topTerms.slice(0, 4).join(" · ")}</p>
+              </article>
+            `
+          )
+          .join("")}
+      </div>
+    `
+    : `<p class="topic-empty">No cluster summary is available for the current topic focus.</p>`;
+}
+
+function renderTrendList(items, direction) {
+  if (!items.length) {
+    return `<p class="topic-empty">No strong movement is visible for the current year.</p>`;
   }
 
-  const margin = { top: 42, right: 88, bottom: 28, left: 88 };
-  const innerWidth = width - margin.left - margin.right;
-  const innerHeight = height - margin.top - margin.bottom;
-  const group = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
-  const maxRank = d3.max(data.hiddenConnectors, (paper) => Math.max(paper.citationRank, paper.structuralRank)) || 1;
-  const x = d3.scaleLinear().domain([1, maxRank]).range([0, innerWidth]);
-  const papers = data.hiddenConnectors.slice(0, 10);
-  const y = d3.scalePoint().domain(papers.map((paper) => paper.id)).range([0, innerHeight]).padding(0.7);
-  const thickness = d3.scaleLinear().domain(safeExtent(papers, (paper) => paper.gapScore)).range([8, 18]);
+  const maxDelta = Math.max(...items.map((item) => Math.abs(item.growthDelta)), 1);
+  return `
+    <div class="trend-list">
+      ${items
+        .map(
+          (item) => `
+            <div class="trend-item">
+              <div class="trend-item__copy">
+                <strong>${item.label}</strong>
+                <span>${formatInteger.format(item.frequency)} cumulative papers</span>
+              </div>
+              <div class="trend-item__bar">
+                <span class="trend-item__fill trend-item__fill--${direction}" style="width:${Math.max(
+                  12,
+                  Math.round((Math.abs(item.growthDelta) / maxDelta) * 100)
+                )}%"></span>
+              </div>
+              <div class="trend-item__delta">${direction === "down" ? "" : "+"}${formatInteger.format(item.growthDelta)}</div>
+            </div>
+          `
+        )
+        .join("")}
+    </div>
+  `;
+}
 
-  group.append("text").attr("class", "axis-label").attr("x", 0).attr("y", -18).text("More cited");
-  group.append("text").attr("class", "axis-label").attr("x", innerWidth).attr("y", -18).attr("text-anchor", "end").text("More structurally central");
-  group.append("text").attr("class", "small-note").attr("x", 0).attr("y", -2).text("Citation rank");
-  group.append("text").attr("class", "small-note").attr("x", innerWidth).attr("y", -2).attr("text-anchor", "end").text("PageRank rank");
-  group.append("line").attr("x1", x(1)).attr("x2", x(1)).attr("y1", 0).attr("y2", innerHeight).attr("stroke", "#BFDBFE").attr("stroke-width", 1.5);
-  group.append("line").attr("x1", x(maxRank)).attr("x2", x(maxRank)).attr("y1", 0).attr("y2", innerHeight).attr("stroke", "#A7F3D0").attr("stroke-width", 1.5);
+function renderSelectedContext(node, data) {
+  const neighbors = data.edges
+    .filter((edge) => edge.source === node.id || edge.target === node.id)
+    .map((edge) => ({
+      label: edge.source === node.id ? edge.target : edge.source,
+      weight: edge.weight,
+    }))
+    .sort((a, b) => b.weight - a.weight)
+    .slice(0, 5);
 
+  if (!neighbors.length) {
+    return `<p class="topic-empty">This topic is currently visible as a relatively isolated concept.</p>`;
+  }
+
+  return `
+    <div class="neighbor-list">
+      ${neighbors
+        .map(
+          (neighbor) => `
+            <div class="neighbor-item">
+              <strong>${neighbor.label}</strong>
+              <span>${formatInteger.format(neighbor.weight)} shared papers</span>
+            </div>
+          `
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+function accumulateTopicCounts(papers, target) {
   papers.forEach((paper) => {
-    const yPos = y(paper.id) || 0;
-    const x1 = x(paper.citationRank);
-    const x2 = x(paper.structuralRank);
-    const stroke = paper.id === data.selectedPaperId ? "#111827" : "#0F766E";
-
-    group
-      .append("line")
-      .attr("x1", 0)
-      .attr("x2", innerWidth)
-      .attr("y1", yPos)
-      .attr("y2", yPos)
-      .attr("stroke", "rgba(226, 232, 240, 0.8)");
-
-    group
-      .append("path")
-      .attr("d", `M${x1},${yPos} C${x1 + innerWidth * 0.18},${yPos - 18} ${x2 - innerWidth * 0.18},${yPos + 18} ${x2},${yPos}`)
-      .attr("fill", "none")
-      .attr("stroke", stroke)
-      .attr("stroke-width", thickness(paper.gapScore))
-      .attr("stroke-opacity", paper.id === data.selectedPaperId ? 0.88 : 0.42)
-      .attr("stroke-linecap", "round")
-      .style("cursor", "pointer")
-      .on("mouseenter", (event) => {
-        tooltip.show(
-          `<strong>${clampText(paper.title, 88)}</strong>
-          Citation rank: ${formatInteger.format(paper.citationRank)}<br />
-          Structural rank: ${formatInteger.format(paper.structuralRank)}<br />
-          Recognition gap: ${formatDecimal(paper.gapScore, 3)}`,
-          event.offsetX + 12,
-          event.offsetY + 12
-        );
-      })
-      .on("mouseleave", () => tooltip.hide())
-      .on("click", () => store.setState({ selectedPaper: paper.id }));
-
-    group.append("circle").attr("cx", x1).attr("cy", yPos).attr("r", 5).attr("fill", "#2563EB");
-    group.append("circle").attr("cx", x2).attr("cy", yPos).attr("r", 5).attr("fill", "#0F766E");
-    group
-      .append("text")
-      .attr("x", x1 - 10)
-      .attr("y", yPos + 4)
-      .attr("class", "small-note")
-      .attr("text-anchor", "end")
-      .text(`#${paper.citationRank}`);
-    group
-      .append("text")
-      .attr("x", x2 + 10)
-      .attr("y", yPos + 4)
-      .attr("class", "small-note")
-      .text(`#${paper.structuralRank}`);
-    group
-      .append("text")
-      .attr("x", innerWidth / 2)
-      .attr("y", yPos + 4)
-      .attr("class", "small-note")
-      .attr("text-anchor", "middle")
-      .text(clampText(paper.title, 46));
+    extractTopics(paper).forEach((topic) => {
+      target.set(topic, (target.get(topic) || 0) + 1);
+    });
   });
 }
 
-function drawAttentionBarcode(chart, data, tooltip, store) {
-  const { svg, measure } = chart;
-  const { width, height } = measure();
-  svg.selectAll("*").remove();
+function extractTopics(paper) {
+  const concepts = Array.isArray(paper.concepts) ? paper.concepts : [];
+  const uniqueTopics = new Set();
+  concepts.forEach((concept) => {
+    const topic = normalizeTopic(concept);
+    if (topic) {
+      uniqueTopics.add(topic);
+    }
+  });
+  return [...uniqueTopics];
+}
 
-  if (!data.attentionRows.length) {
-    drawEmptyState(svg, width, height, "No attention barcode is available for the current selection.");
+function normalizeTopic(value) {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const topic = value.trim();
+  if (!topic) {
+    return null;
+  }
+  const normalized = topic.toLowerCase();
+  const collapsed = normalized.replace(/[-_/]+/g, " ");
+  if (TOPIC_STOPLIST.has(normalized)) {
+    return null;
+  }
+  if (normalized.length < 4) {
+    return null;
+  }
+  if (
+    /(diabetes|disease|analytics|informatics)/.test(collapsed)
+  ) {
+    return null;
+  }
+  return topic;
+}
+
+function computeTopicClusters(nodes, edges) {
+  const adjacency = new Map(nodes.map((node) => [node.id, new Set()]));
+  edges.forEach((edge) => {
+    adjacency.get(edge.source)?.add(edge.target);
+    adjacency.get(edge.target)?.add(edge.source);
+  });
+
+  const nodeById = new Map(nodes.map((node) => [node.id, node]));
+  const visited = new Set();
+  const clusters = [];
+
+  nodes.forEach((node) => {
+    if (visited.has(node.id)) {
+      return;
+    }
+    const queue = [node.id];
+    const topicIds = [];
+    visited.add(node.id);
+    while (queue.length) {
+      const current = queue.shift();
+      topicIds.push(current);
+      adjacency.get(current)?.forEach((neighbor) => {
+        if (!visited.has(neighbor)) {
+          visited.add(neighbor);
+          queue.push(neighbor);
+        }
+      });
+    }
+
+    const topicNodes = topicIds
+      .map((topicId) => nodeById.get(topicId))
+      .filter(Boolean)
+      .sort((a, b) => b.frequency - a.frequency);
+    clusters.push({
+      id: clusters.length,
+      topicIds,
+      topTerms: topicNodes.slice(0, 4).map((topicNode) => topicNode.label),
+      totalFrequency: d3.sum(topicNodes, (topicNode) => topicNode.frequency),
+    });
+  });
+
+  return clusters.sort((a, b) => b.totalFrequency - a.totalFrequency);
+}
+
+function buildTrendLeaders(nodes) {
+  const positive = nodes.filter((node) => node.momentum > 0).sort((a, b) => b.momentum - a.momentum || b.growthDelta - a.growthDelta);
+  const nonPositive = nodes
+    .filter((node) => node.momentum <= 0)
+    .sort((a, b) => a.momentum - b.momentum || a.growthDelta - b.growthDelta);
+
+  return {
+    risers: positive.slice(0, 6),
+    decliners: nonPositive.slice(0, 6),
+  };
+}
+
+function shouldShowLabel(node, selectedTopic, radius) {
+  if (selectedTopic) {
+    return true;
+  }
+  return true;
+}
+
+function stretchNodesToViewport(nodes, radius, layoutPadding, width, height) {
+  if (!nodes.length) {
     return;
   }
 
-  const margin = { top: 26, right: 20, bottom: 20, left: 56 };
-  const innerWidth = width - margin.left - margin.right;
-  const innerHeight = height - margin.top - margin.bottom;
-  const group = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
-  const y = d3.scaleBand().domain(data.attentionRows.map((row) => row.year)).range([0, innerHeight]).padding(0.18);
-  const maxColumns = d3.max(data.attentionRows, (row) => row.cells.length) || 1;
-  const x = d3.scaleBand().domain(d3.range(maxColumns)).range([0, innerWidth]).paddingInner(0.04);
+  const xExtent = d3.extent(nodes, (node) => node.x);
+  const yExtent = d3.extent(nodes, (node) => node.y);
+  const maxRadius = d3.max(nodes, (node) => radius(node.frequency)) || 0;
+  const usableWidth = width - layoutPadding.left - layoutPadding.right - maxRadius * 2;
+  const usableHeight = height - layoutPadding.top - layoutPadding.bottom - maxRadius * 2;
 
-  data.attentionRows.forEach((row) => {
-    const yPos = y(row.year) || 0;
-    group
-      .append("text")
-      .attr("class", "small-note")
-      .attr("x", -10)
-      .attr("y", yPos + y.bandwidth() / 2 + 4)
-      .attr("text-anchor", "end")
-      .text(row.year);
+  if ((xExtent[1] || 0) - (xExtent[0] || 0) > 1) {
+    const xScale = d3
+      .scaleLinear()
+      .domain(xExtent)
+      .range([layoutPadding.left + maxRadius, layoutPadding.left + maxRadius + usableWidth]);
+    nodes.forEach((node) => {
+      node.x = xScale(node.x);
+    });
+  }
 
-    group
-      .append("rect")
-      .attr("x", 0)
-      .attr("y", yPos)
-      .attr("width", innerWidth)
-      .attr("height", y.bandwidth())
-      .attr("rx", 10)
-      .attr("fill", row.gini > 0.7 ? "rgba(219, 234, 254, 0.42)" : "rgba(239, 246, 255, 0.72)");
-
-    group
-      .selectAll(`.barcode-${row.year}`)
-      .data(row.cells)
-      .join("rect")
-      .attr("x", (cell) => x(cell.order))
-      .attr("y", yPos)
-      .attr("width", x.bandwidth())
-      .attr("height", y.bandwidth())
-      .attr("fill", (cell) => d3.interpolateRgbBasis(["#DBEAFE", "#60A5FA", "#1D4ED8"])(Math.min(1, cell.share * 12)))
-      .attr("opacity", (cell) => 0.24 + Math.min(0.76, cell.share * 14))
-      .style("cursor", "pointer")
-      .on("mouseenter", (event, cell) => {
-        tooltip.show(
-          `<strong>${clampText(cell.paper.title, 88)}</strong>
-          Year: ${row.year}<br />
-          Citations: ${formatInteger.format(cell.paper.citations || 0)}<br />
-          Share of yearly citations: ${formatPercent.format(cell.share)}<br />
-          Yearly Gini: ${formatDecimal(row.gini, 3)}`,
-          event.offsetX + 12,
-          event.offsetY + 12
-        );
-      })
-      .on("mouseleave", () => tooltip.hide())
-      .on("click", (_, cell) => store.setState({ selectedPaper: cell.paper.id }));
-  });
+  if ((yExtent[1] || 0) - (yExtent[0] || 0) > 1) {
+    const yScale = d3
+      .scaleLinear()
+      .domain(yExtent)
+      .range([layoutPadding.top + maxRadius, layoutPadding.top + maxRadius + usableHeight]);
+    nodes.forEach((node) => {
+      node.y = yScale(node.y);
+    });
+  }
 }
 
-function buildRibbonPath(source, target) {
-  const mx = (source.x + target.x) / 2;
-  const my = (source.y + target.y) / 2;
-  const dx = target.x - source.x;
-  const dy = target.y - source.y;
-  const curve = Math.hypot(dx, dy) * 0.16;
-  return `M${source.x},${source.y} Q${mx + dy * 0.08},${my - dx * 0.08 - curve} ${target.x},${target.y}`;
+function clampYear(year, minYear, maxYear) {
+  return Math.max(minYear, Math.min(maxYear, Number.isFinite(year) ? year : maxYear));
 }
 
 function safeExtent(values, accessor) {
+  if (!values.length) {
+    return [0, 1];
+  }
   const extent = d3.extent(values, accessor);
   if (!Number.isFinite(extent[0]) || !Number.isFinite(extent[1])) {
     return [0, 1];
@@ -569,21 +836,16 @@ function safeExtent(values, accessor) {
   return extent;
 }
 
-function drawEmptyState(svg, width, height, text) {
-  svg.append("text").attr("class", "empty-state").attr("x", width / 2).attr("y", height / 2).attr("text-anchor", "middle").text(text);
+function formatTrend(delta) {
+  if (delta > 0) {
+    return `+${formatInteger.format(delta)} papers`;
+  }
+  if (delta < 0) {
+    return `${formatInteger.format(delta)} papers`;
+  }
+  return "Flat";
 }
 
-function calculateGini(values) {
-  const sorted = [...values].filter(Number.isFinite).sort((a, b) => a - b);
-  const total = d3.sum(sorted);
-  if (!sorted.length || total === 0) {
-    return 0;
-  }
-  let cumulative = 0;
-  let weighted = 0;
-  sorted.forEach((value) => {
-    cumulative += value;
-    weighted += cumulative;
-  });
-  return (sorted.length + 1 - (2 * weighted) / total) / sorted.length;
+function drawEmptyState(svg, width, height, text) {
+  svg.append("text").attr("class", "empty-state").attr("x", width / 2).attr("y", height / 2).attr("text-anchor", "middle").text(text);
 }

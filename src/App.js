@@ -20,6 +20,8 @@ export async function initializeApp(root) {
       selectedPaper: null,
       selectedPaperDistance: 1,
       yearRange: dataset.summary.yearExtent,
+      topicYear: dataset.summary.yearExtent[1],
+      selectedTopic: null,
       metricView: "citations",
       activeCluster: null,
       selectedInstitutions: [],
@@ -119,11 +121,11 @@ export async function initializeApp(root) {
 
     const sandbox = renderSection(sectionsRoot, {
       id: "beyond",
-      title: "Beyond citation counts",
+      title: "Thematic evolution of the field",
       context:
-        "The final section leaves standard dashboard grammar behind and turns the project’s core claim into more atmospheric evidence: influence is uneven, structural importance hides in plain sight, and visibility is not the same thing as necessity.",
+        "This section shifts from papers to topics. The temporal word map tracks how concepts accumulate, cluster, and reorganize over time so we can see which themes become dominant and which remain peripheral.",
       insight:
-        "This is the reveal. The visuals below are meant to make mismeasurement feel tangible, not just statistically defensible.",
+        "Themes do not rise evenly. Scrub the timeline to watch topics emerge, thicken their co-occurrence ties, and form the conceptual neighborhoods that structure the field.",
     });
     renderExperimentalAtlas(sandbox.viz, dataset, store);
 

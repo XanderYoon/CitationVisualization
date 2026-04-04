@@ -50,6 +50,7 @@ export function renderDataTransparency(root, dataset, store) {
 
   function renderLiveState(state) {
     const selectedPaper = state.selectedPaper ? paperById.get(state.selectedPaper) : null;
+    const selectedTopic = state.selectedTopic || "None";
     const clusterLabel =
       state.activeCluster === null || state.activeCluster === undefined ? "All clusters" : `Cluster ${state.activeCluster}`;
     const selectedInstitutions = state.selectedInstitutions?.length
@@ -76,6 +77,14 @@ export function renderDataTransparency(root, dataset, store) {
       <div class="transparency-live__item">
         <span class="transparency-live__label">Selected paper</span>
         <strong>${selectedPaper ? selectedPaper.title : "None"}</strong>
+      </div>
+      <div class="transparency-live__item">
+        <span class="transparency-live__label">Topic map year</span>
+        <strong>${state.topicYear ?? state.yearRange[1]}</strong>
+      </div>
+      <div class="transparency-live__item">
+        <span class="transparency-live__label">Selected topic</span>
+        <strong>${selectedTopic}</strong>
       </div>
       <div class="transparency-live__item">
         <span class="transparency-live__label">Network focus depth</span>
