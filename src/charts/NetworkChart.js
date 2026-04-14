@@ -16,6 +16,16 @@ export function renderNetworkChart(root, dataset, store) {
   note.textContent =
     "Each circle is a paper. Larger circles have higher PageRank. Colors separate connected components, and darker links reveal where citation relationships are actually observed in the corpus.";
   card.append(note);
+  const legend = document.createElement("div");
+  legend.className = "legend-row";
+  legend.style.marginTop = "8px";
+  legend.innerHTML = `
+    <span class="legend-item"><span class="legend-swatch" style="background:#2563EB"></span> Largest Cluster</span>
+    <span class="legend-item"><span class="legend-swatch" style="background:#0F766E"></span> Second Largest</span>
+    <span class="legend-item"><span class="legend-swatch" style="background:#DC2626"></span> Third Largest</span>
+    <span class="legend-item"><span class="legend-swatch" style="background:#111827"></span> Selected Paper</span>
+  `;
+  card.append(legend);
   const meta = document.createElement("div");
   meta.className = "network-meta";
   card.append(meta);
