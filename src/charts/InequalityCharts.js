@@ -84,7 +84,7 @@ function renderHistogram(chart, values, margin, metricView) {
   const group = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
   const sanitized = values.filter((value) => value > 0);
   const x = d3.scaleLog().domain(d3.extent(sanitized.length ? sanitized : [1, 10])).nice().range([0, innerWidth]);
-  const bins = d3.bin().domain(x.domain()).thresholds(18)(sanitized);
+  const bins = d3.bin().domain(x.domain()).thresholds(x.ticks(18))(sanitized);
   const y = d3
     .scaleLinear()
     .domain([0, d3.max(bins, (bin) => bin.length) || 1])
