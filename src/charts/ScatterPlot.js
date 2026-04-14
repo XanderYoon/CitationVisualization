@@ -114,6 +114,10 @@ export function renderScatterPlot(root, dataset, store) {
         .attr("class", "annotation-label")
         .attr("x", Math.min(innerWidth - 8, x(Math.max(1, hiddenPaper.citations || 1)) + 10))
         .attr("y", y(hiddenPaper.pagerank || 0) - 10)
+        .style("paint-order", "stroke")
+        .style("stroke", "rgba(255,255,255,0.9)")
+        .style("stroke-width", "4px")
+        .style("stroke-linejoin", "round")
         .text(`Hidden connector: ${clampText(hiddenPaper.title, 34)}`);
     }
 
