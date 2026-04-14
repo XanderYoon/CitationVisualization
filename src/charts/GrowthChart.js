@@ -69,6 +69,7 @@ export function renderGrowthChart(root, dataset, store) {
 
     const citationsLine = d3
       .line()
+      .defined((d) => d.num_papers >= 5) // Ignores outlier years with too few papers
       .x((d) => x(d.year))
       .y((d) => y(d.avg_citations));
 
