@@ -9,12 +9,12 @@ export function renderNetworkChart(root, dataset, store) {
   const card = renderVizCard(
     root,
     "Force-directed citation graph",
-    "Hover for focus mode. Click a node to select it, click again to deselect, and expand the highlight by hop distance."
+    "Hover over a paper to inspect its connections. Click to select it and expand its neighborhood."
   );
   const note = document.createElement("p");
   note.className = "chart-note";
   note.textContent =
-    "Each circle is a paper. Larger circles have higher PageRank. Colors separate connected components, and darker links reveal where citation relationships are actually observed in the corpus.";
+    "Each circle represents a paper. Larger circles are more structurally important. Colors show major network groups, and links represent citation relationships in the corpus.";
   card.append(note);
   const legend = document.createElement("div");
   legend.className = "legend-row";

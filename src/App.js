@@ -32,15 +32,15 @@ export async function initializeApp(root) {
       <div class="app-layout">
         <nav class="section-nav" aria-label="Visualization navigation">
           <p class="section-nav__label">Navigate</p>
-          <a href="#framing" class="section-nav__link">Framing</a>
+          <a href="#framing" class="section-nav__link">Overview</a>
           <a href="#growth" class="section-nav__link">Growth</a>
           <a href="#inequality" class="section-nav__link">Inequality</a>
           <a href="#network" class="section-nav__link">Network</a>
-          <a href="#catalysts" class="section-nav__link">Catalysts</a>
-          <a href="#metrics" class="section-nav__link">Metrics</a>
+          <a href="#catalysts" class="section-nav__link">Breakout Papers</a>
+          <a href="#metrics" class="section-nav__link">Citations vs Centrality</a>
           <a href="#institutions" class="section-nav__link">Institutions</a>
-          <a href="#beyond" class="section-nav__link">Beyond Counts</a>
-          <a href="#transparency" class="section-nav__link">Transparency</a>
+          <a href="#beyond" class="section-nav__link">Topics</a>
+          <a href="#transparency" class="section-nav__link">Data</a>
         </nav>
         <div class="app-sections"></div>
       </div>
@@ -50,82 +50,82 @@ export async function initializeApp(root) {
 
     const intro = renderSection(sectionsRoot, {
       id: "framing",
-      title: "Framing the problem",
+      title: "At a glance",
       context:
-        "These headline measures establish the size of the corpus, the thinness of its citation structure, and the small set of actors carrying most of the visible load.",
+        "This overview introduces the scale of the literature and how unevenly attention is distributed.",
       insight:
-        "A large literature can still be structurally narrow. The cards below frame that tension before the charts separate growth from true influence.",
+        "A large field can still be dominated by a relatively small number of influential papers and institutions.",
     });
     renderHeroStats(intro.viz, dataset, store);
 
     const growth = renderSection(sectionsRoot, {
       id: "growth",
-      title: "Growth of the field",
+      title: "Field growth",
       context:
-        "Publication volume accelerates sharply after 2015. Brushing the timeline narrows every downstream view to the selected years, making it easier to compare expansion with attention per paper.",
+        "Publication volume rises sharply after 2015. Use the timeline to focus on specific years.",
       insight:
-        "Expansion after 2015 is unmistakable, but attention does not scale with output. Use the brush to isolate periods where paper volume rises faster than citations per paper.",
+        "Output grows quickly, but attention per paper does not increase at the same rate.",
     });
     renderVizCard(growth.viz, "Annual growth trajectory", "Brush across the timeline to filter the platform by year.");
     renderGrowthChart(growth.viz.lastElementChild, dataset, store);
 
     const inequality = renderSection(sectionsRoot, {
       id: "inequality",
-      title: "Inequality of influence",
+      title: "Citation inequality",
       context:
-        "Citation counts and network centrality produce different rankings but similar concentration patterns. The histogram exposes the tail; the Lorenz curve and Gini readout quantify how extreme that skew becomes.",
+        "This section compares citation counts and PageRank to show how unevenly influence is distributed.",
       insight:
-        "The distribution is not just skewed; it is structurally lopsided. A small slice of papers captures a disproportionate share of attention under either metric.",
+        "A small number of papers accounts for a large share of attention.",
     });
     renderInequalityCharts(inequality.viz, dataset, store);
 
     const network = renderSection(sectionsRoot, {
       id: "network",
-      title: "The citation network",
+      title: "Network structure",
       context:
-        "The graph treats the literature as a structure rather than a leaderboard. Node size follows PageRank, color separates connected components, and focus mode reveals the neighborhood around bridging works.",
+        "This graph shows how papers connect through citations rather than as a simple ranking.",
       insight:
-        "Clusters reveal subfields, but the most consequential papers are often the connectors between them. Hover and click to see how individual papers hold the graph together.",
+        "Some papers matter because they connect clusters, not just because they are highly cited.",
     });
     renderNetworkChart(network.viz, dataset, store);
 
     const caseStudies = renderSection(sectionsRoot, {
       id: "catalysts",
-      title: "Catalyst papers",
+      title: "Breakout papers",
       context:
-        "Some papers alter the pace of the literature around them. Compare up to three works to see how their citation trajectories separate once they enter the field.",
+        "Compare selected papers to see how their citation trajectories separate over time.",
       insight:
-        "Catalyst papers do not simply accumulate citations; they separate early and stay ahead. The comparison view makes those breakaway trajectories legible.",
+        "Some papers pull ahead early and continue shaping the pace of the field.",
     });
     renderComparisonChart(caseStudies.viz, dataset, store);
 
     const critique = renderSection(sectionsRoot, {
       id: "metrics",
-      title: "Metrics critique",
+      title: "Citations vs centrality",
       context:
-        "Popularity and structural necessity are not equivalent. This scatter plot places raw citations against PageRank so papers with modest visibility but high connective value become easier to spot.",
+        "Citation count and structural importance are related, but they are not the same.",
       insight:
-        "The most visible paper is not always the most necessary paper. The chart below isolates works whose structural role exceeds the attention they receive.",
+        "Highly cited papers are not always the most important papers in the network.",
     });
     renderScatterPlot(critique.viz, dataset, store);
 
     const geography = renderSection(sectionsRoot, {
       id: "institutions",
-      title: "Institutions",
+      title: "Institutional concentration",
       context:
-        "Institutional output clusters around a limited set of hubs. Switching between citation totals and aggregate PageRank reveals where visibility and structural leverage diverge.",
+        "This section compares institutions by citation totals and aggregate PageRank.",
       insight:
-        "Institutional concentration is visible both in rankings and on the map. The key question is whether the same hubs dominate popularity and structural centrality.",
+        "A small number of institutions dominates visibility and structural influence in the field.",
     });
     renderInstitutionChart(geography.viz, dataset, store);
 
     const sandbox = renderSection(sectionsRoot, {
       id: "beyond",
-      title: "Thematic evolution of the field",
+      title: "Topic evolution",
       context:
-        "This section shifts from papers to topics. The temporal word map tracks how concepts accumulate, cluster, and reorganize over time so we can see which themes become dominant and which remain peripheral.",
+        "This section shifts from papers to themes, showing how topics accumulate and change over time.",
       insight:
-        "Themes do not rise evenly. Scrub the timeline to watch topics emerge, thicken their co-occurrence ties, and form the conceptual neighborhoods that structure the field.",
+        "Some themes become central quickly, while others remain more peripheral.",
     });
     renderExperimentalAtlas(sandbox.viz, dataset, store);
 
